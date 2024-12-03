@@ -34,42 +34,64 @@ class Conv1d(minitorch.Module):
         self.bias = RParam(1, out_channels, 1)
 
     def forward(self, input):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Get dimensions
+        batch, in_channels, length = input.shape
+        out_channels, _, kernel_width = self.weights.value.shape
+        
+        # Calculate output length
+        out_length = length - kernel_width + 1
+        
+        # Reshape input for convolution
+        input_reshaped = input.permute(1, 2, 0).contiguous()
+        input_col = input_reshaped.view(in_channels, length * batch)
+        
+        # Reshape weights
+        weight_reshaped = self.weights.value.view(out_channels, in_channels * kernel_width)
+        
+        # Perform convolution
+        result = weight_reshaped @ input_col + self.bias.value
+        
+        # Reshape to final dimensions
+        return result.view(out_channels, out_length, batch).permute(2, 0, 1)
 
 
 class CNNSentimentKim(minitorch.Module):
-    """
-    Implement a CNN for Sentiment classification based on Y. Kim 2014.
-
-    This model should implement the following procedure:
-
-    1. Apply a 1d convolution with input_channels=embedding_dim
-        feature_map_size=100 output channels and [3, 4, 5]-sized kernels
-        followed by a non-linear activation function (the paper uses tanh, we apply a ReLu)
-    2. Apply max-over-time across each feature map
-    3. Apply a Linear to size C (number of classes) followed by a ReLU and Dropout with rate 25%
-    4. Apply a sigmoid over the class dimension.
-    """
-
-    def __init__(
-        self,
-        feature_map_size=100,
-        embedding_size=50,
-        filter_sizes=[3, 4, 5],
-        dropout=0.25,
-    ):
+    def __init__(self, feature_map_size=100, embedding_size=50, filter_sizes=[3, 4, 5], dropout=0.25):
         super().__init__()
         self.feature_map_size = feature_map_size
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.dropout = dropout
+        
+        # Create convolution layers for each filter size
+        self.convs = []
+        for filter_size in filter_sizes:
+            self.convs.append(Conv1d(embedding_size, feature_map_size, filter_size))
+        
+        # Final linear layer
+        total_features = feature_map_size * len(filter_sizes)
+        self.linear = Linear(total_features, 1)
 
     def forward(self, embeddings):
-        """
-        embeddings tensor: [batch x sentence length x embedding dim]
-        """
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # Permute embeddings to match conv1d input format
+        x = embeddings.permute(0, 2, 1)
+        
+        # Apply convolutions and max-over-time pooling
+        conv_outputs = []
+        for conv in self.convs:
+            # Apply convolution and ReLU
+            conv_out = conv.forward(x).relu()
+            # Max-over-time pooling
+            pooled = minitorch.max(conv_out, dim=2)
+            conv_outputs.append(pooled)
+        
+        # Concatenate all pooled features
+        combined = minitorch.tensor_concat(conv_outputs, dim=1)
+        
+        # Apply dropout
+        dropped = minitorch.dropout(combined, self.dropout)
+        
+        # Final linear layer and sigmoid
+        logits = self.linear.forward(dropped)
+        return logits.sigmoid().view(logits.shape[0])
 
 
 # Evaluation helper methods

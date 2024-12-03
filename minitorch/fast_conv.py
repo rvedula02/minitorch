@@ -87,11 +87,41 @@ def _tensor_conv1d(
         and in_channels == in_channels_
         and out_channels == out_channels_
     )
-    s1 = input_strides
-    s2 = weight_strides
 
-    # TODO: Implement for Task 4.1.
-    raise NotImplementedError("Need to implement for Task 4.1")
+    # Loop over output positions
+    for out_pos in prange(out_size):
+        out_index = np.zeros(3, np.int32)
+        to_index(out_pos, out_shape, out_index)
+        batch = out_index[0]
+        out_channel = out_index[1]
+        out_width = out_index[2]
+        
+        # Initialize accumulator
+        acc = 0.0
+        
+        # Loop over input channels and kernel width
+        for in_channel in range(in_channels):
+            for k in range(kw):
+                # Calculate input position based on kernel position
+                if not reverse:
+                    w_pos = out_width + k
+                else:
+                    w_pos = out_width - k
+                
+                # Skip if outside input bounds
+                if w_pos < 0 or w_pos >= width:
+                    continue
+                
+                # Get input and weight values and multiply
+                input_index = np.array([batch, in_channel, w_pos])
+                weight_index = np.array([out_channel, in_channel, k])
+                
+                input_pos = index_to_position(input_index, input_strides)
+                weight_pos = index_to_position(weight_index, weight_strides)
+                
+                acc += input[input_pos] * weight[weight_pos]
+        
+        out[out_pos] = acc
 
 
 tensor_conv1d = njit(_tensor_conv1d, parallel=True)
@@ -170,40 +200,7 @@ def _tensor_conv2d(
     weight_strides: Strides,
     reverse: bool,
 ) -> None:
-    """2D Convolution implementation.
-
-    Given input tensor of
-
-       `batch, in_channels, height, width`
-
-    and weight tensor
-
-       `out_channels, in_channels, k_height, k_width`
-
-    Computes padded output of
-
-       `batch, out_channels, height, width`
-
-    `Reverse` decides if weight is anchored top-left (False) or bottom-right.
-    (See diagrams)
-
-
-    Args:
-    ----
-        out (Storage): storage for `out` tensor.
-        out_shape (Shape): shape for `out` tensor.
-        out_strides (Strides): strides for `out` tensor.
-        out_size (int): size of the `out` tensor.
-        input (Storage): storage for `input` tensor.
-        input_shape (Shape): shape for `input` tensor.
-        input_strides (Strides): strides for `input` tensor.
-        weight (Storage): storage for `input` tensor.
-        weight_shape (Shape): shape for `input` tensor.
-        weight_strides (Strides): strides for `input` tensor.
-        reverse (bool): anchor weight at top-left or bottom-right
-
-    """
-    batch_, out_channels, _, _ = out_shape
+    batch_, out_channels, out_height, out_width = out_shape
     batch, in_channels, height, width = input_shape
     out_channels_, in_channels_, kh, kw = weight_shape
 
@@ -213,14 +210,45 @@ def _tensor_conv2d(
         and out_channels == out_channels_
     )
 
-    s1 = input_strides
-    s2 = weight_strides
-    # inners
-    s10, s11, s12, s13 = s1[0], s1[1], s1[2], s1[3]
-    s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
-
-    # TODO: Implement for Task 4.2.
-    raise NotImplementedError("Need to implement for Task 4.2")
+    # Loop over output positions
+    for out_pos in prange(out_size):
+        out_index = np.zeros(4, np.int32)
+        to_index(out_pos, out_shape, out_index)
+        batch = out_index[0]
+        out_channel = out_index[1]
+        out_height = out_index[2]
+        out_width = out_index[3]
+        
+        # Initialize accumulator
+        acc = 0.0
+        
+        # Loop over input channels and kernel dimensions
+        for in_channel in range(in_channels):
+            for h in range(kh):
+                for w in range(kw):
+                    # Calculate input positions based on kernel position
+                    if not reverse:
+                        h_pos = out_height + h
+                        w_pos = out_width + w
+                    else:
+                        h_pos = out_height - h
+                        w_pos = out_width - w
+                    
+                    # Skip if outside input bounds
+                    if (h_pos < 0 or h_pos >= height or 
+                        w_pos < 0 or w_pos >= width):
+                        continue
+                    
+                    # Get input and weight values and multiply
+                    input_index = np.array([batch, in_channel, h_pos, w_pos])
+                    weight_index = np.array([out_channel, in_channel, h, w])
+                    
+                    input_pos = index_to_position(input_index, input_strides)
+                    weight_pos = index_to_position(weight_index, weight_strides)
+                    
+                    acc += input[input_pos] * weight[weight_pos]
+        
+        out[out_pos] = acc
 
 
 tensor_conv2d = njit(_tensor_conv2d, parallel=True, fastmath=True)
