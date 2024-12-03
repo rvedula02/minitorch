@@ -1,4 +1,4 @@
-# from mnist import MNIST
+from mnist import MNIST
 
 import minitorch
 
