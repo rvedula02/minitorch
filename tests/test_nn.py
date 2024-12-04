@@ -61,16 +61,15 @@ def test_softmax_properties(t: Tensor) -> None:
         sums = s.sum(dim=dim)
         for idx in sums._tensor.indices():
             assert_close(sums[idx], 1.0)
-    
+
     # Test that softmax is between 0 and 1
     s = minitorch.softmax(t, dim=1)
     for idx in s._tensor.indices():
         assert 0 <= s[idx] <= 1
-    
+
     # Test that max value gets highest probability
     dim = 2
     s = minitorch.softmax(t, dim=dim)
-    max_vals = minitorch.max(t, dim=dim)
     for i in range(2):
         for j in range(3):
             max_idx = max(range(4), key=lambda k: t[i, j, k])
@@ -90,7 +89,7 @@ def test_log_softmax(t: Tensor) -> None:
 
 @pytest.mark.task4_4
 @given(tensors())
-def test_drop(t: Tensor) -> None:
+def test_dropout_rate(t: Tensor) -> None:
     q = minitorch.dropout(t, 0.0)
     idx = q._tensor.sample()
     assert q[idx] == t[idx]
@@ -100,9 +99,10 @@ def test_drop(t: Tensor) -> None:
     idx = q._tensor.sample()
     assert q[idx] == t[idx]
 
+
 @pytest.mark.task4_4
 @given(tensors(shape=(1, 1, 4, 4)))
-def test_max_pool(t: Tensor) -> None:
+def test_max_pool_2d(t: Tensor) -> None:
     out = minitorch.maxpool2d(t, (2, 2))
     print(out)
     print(t)
@@ -119,39 +119,6 @@ def test_max_pool(t: Tensor) -> None:
     assert_close(
         out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(1) for j in range(2)])
     )
-
-@pytest.mark.task4_4
-@given(tensors(shape=(1, 1, 4, 4)))
-def test_max_pool(t: Tensor) -> None:
-    out = minitorch.maxpool2d(t, (2, 2))
-    print(out)
-    print(t)
-    assert_close(
-        out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(2) for j in range(2)])
-    )
-
-    out = minitorch.maxpool2d(t, (2, 1))
-    assert_close(
-        out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(2) for j in range(1)])
-    )
-
-    out = minitorch.maxpool2d(t, (1, 2))
-    assert_close(
-        out[0, 0, 0, 0], max([t[0, 0, i, j] for i in range(1) for j in range(2)])
-    )
-
-
-@pytest.mark.task4_4
-@given(tensors())
-def test_drop(t: Tensor) -> None:
-    q = minitorch.dropout(t, 0.0)
-    idx = q._tensor.sample()
-    assert q[idx] == t[idx]
-    q = minitorch.dropout(t, 1.0)
-    assert q[q._tensor.sample()] == 0.0
-    q = minitorch.dropout(t, 1.0, ignore=True)
-    idx = q._tensor.sample()
-    assert q[idx] == t[idx]
 
 
 @pytest.mark.task4_4
@@ -170,7 +137,7 @@ def test_softmax(t: Tensor) -> None:
 
 @pytest.mark.task4_4
 @given(tensors(shape=(1, 1, 4, 4)))
-def test_log_softmax(t: Tensor) -> None:
+def test_log_softmax_2d(t: Tensor) -> None:
     q = minitorch.softmax(t, 3)
     q2 = minitorch.logsoftmax(t, 3).exp()
     for i in q._tensor.indices():
