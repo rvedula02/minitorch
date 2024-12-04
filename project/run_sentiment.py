@@ -1,4 +1,5 @@
 import random
+import os
 
 import embeddings
 
@@ -34,24 +35,10 @@ class Conv1d(minitorch.Module):
         self.bias = RParam(1, out_channels, 1)
 
     def forward(self, input):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        return minitorch.conv1d(input, self.weights.value) + self.bias.value
 
 
 class CNNSentimentKim(minitorch.Module):
-    """
-    Implement a CNN for Sentiment classification based on Y. Kim 2014.
-
-    This model should implement the following procedure:
-
-    1. Apply a 1d convolution with input_channels=embedding_dim
-        feature_map_size=100 output channels and [3, 4, 5]-sized kernels
-        followed by a non-linear activation function (the paper uses tanh, we apply a ReLu)
-    2. Apply max-over-time across each feature map
-    3. Apply a Linear to size C (number of classes) followed by a ReLU and Dropout with rate 25%
-    4. Apply a sigmoid over the class dimension.
-    """
-
     def __init__(
         self,
         feature_map_size=100,
@@ -62,14 +49,28 @@ class CNNSentimentKim(minitorch.Module):
         super().__init__()
         self.feature_map_size = feature_map_size
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        self.layer1 = Conv1d(embedding_size, feature_map_size, filter_sizes[0])
+        self.layer2 = Conv1d(embedding_size, feature_map_size, filter_sizes[1])
+        self.layer3 = Conv1d(embedding_size, feature_map_size, filter_sizes[2])
+        self.layer4 = Linear(feature_map_size, 1)
+        self.dropout = dropout
 
     def forward(self, embeddings):
         """
         embeddings tensor: [batch x sentence length x embedding dim]
         """
         # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        embeddings = embeddings.permute(0, 2, 1)
+        # feature maps
+        c1 = self.layer1.forward(embeddings).relu()
+        c2 = self.layer2.forward(embeddings).relu()
+        c3 = self.layer3.forward(embeddings).relu()
+
+        max_over_time = (minitorch.nn.max(c1, 2) + minitorch.nn.max(c2, 2) + minitorch.nn.max(c3, 2))
+
+        h = self.layer4.forward(max_over_time.view(max_over_time.shape[0], max_over_time.shape[1]))
+        h = minitorch.nn.dropout(h, self.dropout, not self.training)
+        return h.sigmoid().view(embeddings.shape[0])
 
 
 # Evaluation helper methods
@@ -109,10 +110,23 @@ def default_log_fn(
     best_val = (
         best_val if best_val > validation_accuracy[-1] else validation_accuracy[-1]
     )
-    print(f"Epoch {epoch}, loss {train_loss}, train accuracy: {train_accuracy[-1]:.2%}")
+
+    # Create log message
+    log_msg = f"Epoch {epoch}, loss {train_loss}, train accuracy: {train_accuracy[-1]:.2%}"
     if len(validation_predictions) > 0:
-        print(f"Validation accuracy: {validation_accuracy[-1]:.2%}")
-        print(f"Best Valid accuracy: {best_val:.2%}")
+        log_msg += f"\nValidation accuracy: {validation_accuracy[-1]:.2%}"
+        log_msg += f"\nBest Valid accuracy: {best_val:.2%}"
+
+    # Print to console
+    print(log_msg)
+
+    # Write to log file
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "sentiment_training.log")
+
+    with open(log_file, "a") as f:
+        f.write(log_msg + "\n")
 
 
 class SentenceSentimentTrain:
