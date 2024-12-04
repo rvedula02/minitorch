@@ -1,4 +1,5 @@
 import random
+import os
 
 import embeddings
 
@@ -109,10 +110,23 @@ def default_log_fn(
     best_val = (
         best_val if best_val > validation_accuracy[-1] else validation_accuracy[-1]
     )
-    print(f"Epoch {epoch}, loss {train_loss}, train accuracy: {train_accuracy[-1]:.2%}")
+    
+    # Create log message
+    log_msg = f"Epoch {epoch}, loss {train_loss}, train accuracy: {train_accuracy[-1]:.2%}"
     if len(validation_predictions) > 0:
-        print(f"Validation accuracy: {validation_accuracy[-1]:.2%}")
-        print(f"Best Valid accuracy: {best_val:.2%}")
+        log_msg += f"\nValidation accuracy: {validation_accuracy[-1]:.2%}"
+        log_msg += f"\nBest Valid accuracy: {best_val:.2%}"
+    
+    # Print to console
+    print(log_msg)
+    
+    # Write to log file
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    log_file = os.path.join(log_dir, "sentiment_training.log")
+    
+    with open(log_file, "a") as f:
+        f.write(log_msg + "\n")
 
 
 class SentenceSentimentTrain:
